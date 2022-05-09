@@ -1,23 +1,38 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart' as syspaths;
+import 'package:path/path.dart' as path;
 
 class ImageInput extends StatefulWidget {
-  const ImageInput({Key? key}) : super(key: key);
+  const ImageInput({Key? key, required this.onSelectImage}) : super(key: key);
+  final Function onSelectImage;
 
   @override
   State<ImageInput> createState() => _ImageInputState();
 }
 
 class _ImageInputState extends State<ImageInput> {
-  // ignore: prefer_typing_uninitialized_variables
-  var _image;
+  File? _storedImage;
 
-  Future<void> _takePicture() async {
-    final imagePicker = ImagePicker();
-    await imagePicker.pickImage(
-      source: ImageSource.gallery,
+  Future<void> _takePicture(source) async {
+    final picker = ImagePicker();
+    final imageFile = await picker.pickImage(
+      source: source,
       maxWidth: 600,
     );
+    if (imageFile == null) {
+      return;
+    }
+    final rlyImageFile = File(imageFile.path);
+    setState(() {
+      _storedImage = rlyImageFile;
+    });
+    final appDir = await syspaths.getApplicationDocumentsDirectory();
+    final fileName = path.basename(rlyImageFile.path);
+    final savedImage = await rlyImageFile.copy('${appDir.path}/$fileName');
+    widget.onSelectImage(savedImage);
   }
 
   @override
@@ -33,9 +48,9 @@ class _ImageInputState extends State<ImageInput> {
               color: Colors.grey,
             ),
           ),
-          child: _image != null
+          child: _storedImage != null
               ? Image.file(
-                  _image,
+                  _storedImage!,
                   fit: BoxFit.cover,
                 )
               : const Text(
@@ -48,11 +63,18 @@ class _ImageInputState extends State<ImageInput> {
           width: 10,
         ),
         Expanded(
-          child: ElevatedButton.icon(
-            onPressed: _takePicture,
-            icon: const Icon(Icons.camera),
-            label: const Text("Take Picture"),
-          ),
+          child: Column(children: [
+            ElevatedButton.icon(
+              onPressed: () => _takePicture(ImageSource.camera),
+              icon: const Icon(Icons.camera),
+              label: const Text("Take Picture"),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => _takePicture(ImageSource.gallery),
+              icon: const Icon(Icons.storage),
+              label: const Text("Open Gallery"),
+            ),
+          ]),
         ),
       ],
     );
